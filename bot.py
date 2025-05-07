@@ -161,7 +161,7 @@ async def handle_star(callback: types.CallbackQuery):
 
 # ====== Фоновый таск для напоминаний ======
 async def reminder_loop():
-    await bot.wait_until_ready()
+    # запускаем цикл без ожидания готовности бота
     while True:
         now = datetime.now()
         data = load_data()
@@ -175,8 +175,8 @@ async def reminder_loop():
                         await bot.send_message(
                             chat_id=int(user_id),
                             text=(
-                                f"🔔 Через 15 минут на сцене {entry['scene']} {entry['artist']} "
-                                f"в {entry['time']}"
+                                f"🔔 Через 15 минут на сцене {entry['scene']} "
+                                f"{entry['artist']} в {entry['time']}"
                             )
                         )
                         entry["notified"] = True
