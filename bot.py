@@ -1,7 +1,7 @@
 import os
 import json
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import (
     ReplyKeyboardMarkup, KeyboardButton,
@@ -47,7 +47,6 @@ SCENES = {
         ("2025-06-15 18:00", "The Hatters"),
     ],
     "TITANA": [
-        # 13 июня
         ("2025-06-13 16:00", "Baby Cute"),
         ("2025-06-13 16:40", "Пальцева Экспириенс"),
         ("2025-06-13 17:40", "Людмил Огурченко"),
@@ -56,7 +55,6 @@ SCENES = {
         ("2025-06-13 20:40", "Yan Dilan"),
         ("2025-06-13 21:50", "Конец солнечных дней"),
         ("2025-06-14 00:30", "The OM"),
-        # 14 июня
         ("2025-06-14 12:00", "Три Вторых"),
         ("2025-06-14 12:50", "El Mashe"),
         ("2025-06-14 13:40", "Inna Syberia"),
@@ -88,16 +86,14 @@ def save_data(data):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-# ====== Клавиатура главного меню ======
+# ====== Главное меню ======
 main_kb = ReplyKeyboardMarkup(resize_keyboard=True)
-# первая строка
 main_kb.row(
     KeyboardButton("SIRENA"),
     KeyboardButton("TITANA"),
     KeyboardButton("Сцена 3"),
     KeyboardButton("Сцена 4"),
 )
-# вторая строка
 main_kb.row(
     KeyboardButton("Сцена 5"),
     KeyboardButton("Сцена 6"),
@@ -120,18 +116,17 @@ async def cmd_start(message: types.Message):
     )
     await message.reply(text, reply_markup=main_kb)
 
-@dp.message_handler(lambda m: m.text in SCENES.keys())
+@dp.message_handler(lambda m: m.text in SCENES)
 async def open_schedule(message: types.Message):
     scene = message.text
     sched = SCENES[scene]
     if not sched:
         return await message.reply("Расписание пока недоступно.", reply_markup=main_kb)
     kb = InlineKeyboardMarkup(row_width=2)
-    # две карточки в ряд
-    for time_str, artist in sched:
+    for idx, (time_str, artist) in enumerate(sched):
         kb.insert(InlineKeyboardButton(
             f"{time_str[11:16]} — {artist}",
-            callback_data=f"star|{scene}|{time_str}|{artist}"
+            callback_data=f"star|{scene}|{idx}"
         ))
     await message.reply(f"⏰ Расписание {scene}:", reply_markup=kb)
 
@@ -141,22 +136,21 @@ async def show_favorites(message: types.Message):
     data = load_data().get(user_id, [])
     if not data:
         return await message.reply("У тебя ещё нет избранного.", reply_markup=main_kb)
-    # сортируем по времени
     data_sorted = sorted(data, key=lambda e: e["time"])
-    lines = [
-        f"{e['time'][11:16]} — {e['scene']}: {e['artist']}"
-        for e in data_sorted
-    ]
-    await message.reply("📋 Твоё избранное:\n" + "\n".join(lines),
-                        reply_markup=main_kb)
+    lines = [f"{e['time'][11:16]} — {e['scene']}: {e['artist']}" for e in data_sorted]
+    await message.reply("📋 Твоё избранное:\n" + "\n".join(lines), reply_markup=main_kb)
 
 @dp.callback_query_handler(lambda c: c.data.startswith("star|"))
 async def handle_star(callback: types.CallbackQuery):
-    _, scene, time_str, artist = callback.data.split("|", 3)
+    _, scene, idx_str = callback.data.split("|", 2)
+    idx = int(idx_str)
+    time_str, artist = SCENES[scene][idx]
+
     user_id = str(callback.from_user.id)
     data = load_data()
     picks = data.get(user_id, [])
     entry = {"scene": scene, "time": time_str, "artist": artist, "notified": False}
+
     if not any(e["scene"] == scene and e["time"] == time_str and e["artist"] == artist for e in picks):
         picks.append(entry)
         data[user_id] = picks
@@ -171,38 +165,29 @@ async def reminder_loop():
     while True:
         now = datetime.now()
         data = load_data()
-        changed = False
+        updated = False
         for user_id, picks in data.items():
             for entry in picks:
-                if not entry.get("notified"):
+                if not entry["notified"]:
                     event_time = datetime.fromisoformat(entry["time"])
                     delta = (event_time - now).total_seconds()
                     if 0 < delta <= 15 * 60:
-                        # шлём напоминание
-                        try:
-                            await bot.send_message(
-                                chat_id=int(user_id),
-                                text=(
-                                    f"🔔 Через 15 минут на сцене {entry['scene']} "
-                                    f"{entry['artist']} в {entry['time'][11:16]}"
-                                )
+                        await bot.send_message(
+                            chat_id=int(user_id),
+                            text=(
+                                f"🔔 Через 15 минут на сцене {entry['scene']} "
+                                f"{entry['artist']} в {entry['time'][11:16]}"
                             )
-                        except:
-                            pass
+                        )
                         entry["notified"] = True
-                        changed = True
-        if changed:
+                        updated = True
+        if updated:
             save_data(data)
         await asyncio.sleep(60)
 
 # ====== Запуск бота ======
-async def on_startup(dp):
-    # запускаем таск напоминаний
+async def on_startup(dp: Dispatcher):
     asyncio.create_task(reminder_loop())
 
 if __name__ == "__main__":
-    executor.start_polling(
-        dp,
-        skip_updates=True,
-        on_startup=on_startup
-    )
+    executor.start_polling(dp, skip_updates=True, on_startup=on_startup)
