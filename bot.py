@@ -17,22 +17,65 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(bot)
 dp.middleware.setup(LoggingMiddleware())
 
-# ====== Расписания сцен (сплошной список) ======
+# ====== Расписания сцен ======
 SCENES = {
     "SIRENA": [
         ("2025-06-13 15:00", "SULA FRAY"),
         ("2025-06-13 16:00", "Luverance"),
-        # ... полный список SIRENA ...
+        ("2025-06-13 17:00", "ГУДТАЙМС"),
+        ("2025-06-13 18:00", "Polnalyubvi"),
+        ("2025-06-13 19:00", "Заточка"),
+        ("2025-06-13 20:00", "TMNV"),
+        ("2025-06-13 21:00", "ХЛЕБ"),
+        ("2025-06-13 22:40", "Три дня дождя"),
+        ("2025-06-14 13:00", "The Translators"),
+        ("2025-06-14 14:00", "PALC"),
+        ("2025-06-14 15:00", "Beautiful boys"),
+        ("2025-06-14 16:00", "3333"),
+        ("2025-06-14 17:00", "Драгни"),
+        ("2025-06-14 18:00", "Кирпичи Big Band"),
+        ("2025-06-14 19:00", "DRUMMATIX"),
+        ("2025-06-14 20:00", "Saluki"),
+        ("2025-06-14 21:00", "ZOLOTO"),
+        ("2025-06-14 22:40", "АРИЯ"),
+        ("2025-06-15 12:00", "СмешBand"),
+        ("2025-06-15 13:00", "Мультfильмы"),
+        ("2025-06-15 14:00", "obraza net"),
+        ("2025-06-15 15:00", "Пётр Налич"),
+        ("2025-06-15 16:00", "мытищи в огне"),
+        ("2025-06-15 17:00", "Базар"),
+        ("2025-06-15 18:00", "The Hatters"),
     ],
     "TITANA": [
         ("2025-06-13 16:00", "Baby Cute"),
         ("2025-06-13 16:40", "Пальцева Экспириенс"),
-        # ... полный список TITANA ...
+        ("2025-06-13 17:40", "Людмил Огурченко"),
+        ("2025-06-13 18:40", "Бюро"),
+        ("2025-06-13 19:40", "OLIGARKH"),
+        ("2025-06-13 20:40", "Yan Dilan"),
+        ("2025-06-13 21:50", "Конец солнечных дней"),
+        ("2025-06-14 00:30", "The OM"),
+        ("2025-06-14 12:00", "Три Вторых"),
+        ("2025-06-14 12:50", "El Mashe"),
+        ("2025-06-14 13:40", "Inna Syberia"),
+        ("2025-06-14 14:40", "Остыл"),
+        ("2025-06-14 15:40", "Manapart"),
+        ("2025-06-14 16:40", "Juzeppe Junior"),
+        ("2025-06-14 17:40", "Манго буст"),
+        ("2025-06-14 18:40", "Хмыров"),
+        ("2025-06-14 19:40", "Стрио"),
+        ("2025-06-14 20:40", "Молодость внутри"),
+        ("2025-06-14 21:50", "Лолита косс"),
+        ("2025-06-15 00:30", "Бонд с кнопкой"),
     ],
-    "Сцена 3": [], "Сцена 4": [], "Сцена 5": [], "Сцена 6": [], "Сцена 7": []
+    "Сцена 3": [],
+    "Сцена 4": [],
+    "Сцена 5": [],
+    "Сцена 6": [],
+    "Сцена 7": [],
 }
 
-# Состояние пользователя: какая сцена выбрана
+# ====== Хранилище выбранной сцены ======
 user_context = {}
 
 # ====== Утилиты ======
@@ -46,7 +89,7 @@ def save_data(data):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-# ====== Главное меню ======
+# ====== Клавиатуры ======
 main_kb = ReplyKeyboardMarkup(resize_keyboard=True)
 main_kb.row(
     KeyboardButton("SIRENA"),
@@ -61,7 +104,6 @@ main_kb.row(
     KeyboardButton("⭐ Избранное"),
 )
 
-# Клавиатура дат
 date_kb = ReplyKeyboardMarkup(resize_keyboard=True)
 date_kb.row(
     KeyboardButton("13 июня"),
@@ -71,7 +113,6 @@ date_kb.row(
 date_kb.row(KeyboardButton("◀️ Назад"))
 
 # ====== Хэндлеры ======
-
 @dp.message_handler(commands=['start'])
 async def cmd_start(message: types.Message):
     text = (
@@ -84,35 +125,31 @@ async def cmd_start(message: types.Message):
     )
     await message.reply(text, reply_markup=main_kb)
 
-@dp.message_handler(lambda m: m.text in SCENES.keys())
+@dp.message_handler(lambda m: m.text in SCENES)
 async def choose_scene(message: types.Message):
     scene = message.text
     user_context[message.from_user.id] = scene
-    await message.reply(
-        f"⏳ Выбрана сцена {scene}. Выбери дату:",
-        reply_markup=date_kb
-    )
+    await message.reply(f"⏳ Выбрана сцена {scene}. Выбери дату:", reply_markup=date_kb)
 
 @dp.message_handler(lambda m: m.text in ["13 июня", "14 июня", "15 июня"])
 async def choose_date(message: types.Message):
     user_id = message.from_user.id
-    if user_id not in user_context:
+    scene = user_context.get(user_id)
+    if not scene:
         return await message.reply("Сначала выбери сцену.", reply_markup=main_kb)
-    scene = user_context[user_id]
-    # Преобразуем текст даты в ISO
     day = message.text.split()[0]
     iso_date = f"2025-06-{int(day):02d}"
-    # Фильтруем расписание сцены по дате
-    entries = [
-        (t,a) for t,a in SCENES[scene]
-        if t.startswith(iso_date)
-    ]
+    # Фильтруем расписание
+    entries = [(t, a) for t, a in SCENES[scene] if t.startswith(iso_date)]
     if not entries:
         return await message.reply("На эту дату расписание пусто.", reply_markup=main_kb)
     kb = InlineKeyboardMarkup(row_width=2)
     for idx, (tstr, artist) in enumerate(entries):
         time_only = tstr[11:16]
-        kb.insert(InlineKeyboardButton(time_only, callback_data=f"star|{scene}|{iso_date}|{idx}"))
+        kb.insert(InlineKeyboardButton(
+            time_only,
+            callback_data=f"star|{scene}|{iso_date}|{idx}"
+        ))
     await message.reply(f"🗓 Расписание {scene} на {message.text}:", reply_markup=kb)
 
 @dp.message_handler(lambda m: m.text == "◀️ Назад")
@@ -123,10 +160,11 @@ async def back_to_main(message: types.Message):
 @dp.message_handler(lambda m: m.text == "⭐ Избранное")
 async def show_favorites(message: types.Message):
     user_id = str(message.from_user.id)
-    data = load_data().get(user_id, [])
-    if not data:
+    picks = load_data().get(user_id, [])
+    if not picks:
         return await message.reply("У тебя ещё нет избранного.", reply_markup=main_kb)
-    lines = sorted(data, key=lambda e: e["time"])
+    # Сортируем и форматируем
+    lines = sorted(picks, key=lambda e: e["time"])
     text = "📋 Твоё избранное:\n" + "\n".join(
         f"{e['time']} — {e['scene']}: {e['artist']}" for e in lines
     )
@@ -136,13 +174,15 @@ async def show_favorites(message: types.Message):
 async def handle_star(callback: types.CallbackQuery):
     _, scene, iso_date, idx_str = callback.data.split("|", 3)
     idx = int(idx_str)
-    entries = [(t,a) for t,a in SCENES[scene] if t.startswith(iso_date)]
+    entries = [(t, a) for t, a in SCENES[scene] if t.startswith(iso_date)]
     time_str, artist = entries[idx]
+
     user_id = str(callback.from_user.id)
     data = load_data()
     picks = data.get(user_id, [])
     entry = {"scene": scene, "time": time_str, "artist": artist, "notified": False}
-    if not any(e["scene"]==scene and e["time"]==time_str for e in picks):
+
+    if not any(e["scene"] == scene and e["time"] == time_str for e in picks):
         picks.append(entry)
         data[user_id] = picks
         save_data(data)
@@ -150,7 +190,7 @@ async def handle_star(callback: types.CallbackQuery):
     else:
         await bot.answer_callback_query(callback.id, "✅ Уже в избранном")
 
-# ====== Фоновый таск для напоминаний ======
+# ====== Фоновый таск напоминаний ======
 async def reminder_loop():
     while True:
         now = datetime.now()
@@ -161,7 +201,7 @@ async def reminder_loop():
                 if not entry["notified"]:
                     event_time = datetime.fromisoformat(entry["time"])
                     delta = (event_time - now).total_seconds()
-                    if 0 < delta <= 15*60:
+                    if 0 < delta <= 15 * 60:
                         await bot.send_message(
                             chat_id=int(uid),
                             text=(
