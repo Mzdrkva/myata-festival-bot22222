@@ -196,6 +196,13 @@ async def reminder_loop():
         await asyncio.sleep(60)
 
 # ====== Запуск бота ======
+async def on_startup(dp):
+    # запускаем таск напоминаний
+    asyncio.create_task(reminder_loop())
+
 if __name__ == "__main__":
-    dp.loop.create_task(reminder_loop())
-    executor.start_polling(dp, skip_updates=True)
+    executor.start_polling(
+        dp,
+        skip_updates=True,
+        on_startup=on_startup
+    )
