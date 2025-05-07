@@ -139,15 +139,15 @@ async def choose_date(message: types.Message):
         return await message.reply("Сначала выбери сцену.", reply_markup=main_kb)
     day = message.text.split()[0]
     iso_date = f"2025-06-{int(day):02d}"
-    # Фильтруем расписание
     entries = [(t, a) for t, a in SCENES[scene] if t.startswith(iso_date)]
     if not entries:
         return await message.reply("На эту дату расписание пусто.", reply_markup=main_kb)
     kb = InlineKeyboardMarkup(row_width=2)
     for idx, (tstr, artist) in enumerate(entries):
         time_only = tstr[11:16]
+        # теперь на кнопке и время, и имя артиста
         kb.insert(InlineKeyboardButton(
-            time_only,
+            f"{time_only} — {artist}",
             callback_data=f"star|{scene}|{iso_date}|{idx}"
         ))
     await message.reply(f"🗓 Расписание {scene} на {message.text}:", reply_markup=kb)
@@ -163,7 +163,6 @@ async def show_favorites(message: types.Message):
     picks = load_data().get(user_id, [])
     if not picks:
         return await message.reply("У тебя ещё нет избранного.", reply_markup=main_kb)
-    # Сортируем и форматируем
     lines = sorted(picks, key=lambda e: e["time"])
     text = "📋 Твоё избранное:\n" + "\n".join(
         f"{e['time']} — {e['scene']}: {e['artist']}" for e in lines
