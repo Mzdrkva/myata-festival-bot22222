@@ -125,7 +125,7 @@ async def open_schedule(message: types.Message):
     kb = InlineKeyboardMarkup(row_width=2)
     for idx, (time_str, artist) in enumerate(sched):
         kb.insert(InlineKeyboardButton(
-            f"{time_str[11:16]} — {artist}",
+            f"{time_str} — {artist}",
             callback_data=f"star|{scene}|{idx}"
         ))
     await message.reply(f"⏰ Расписание {scene}:", reply_markup=kb)
@@ -137,7 +137,7 @@ async def show_favorites(message: types.Message):
     if not data:
         return await message.reply("У тебя ещё нет избранного.", reply_markup=main_kb)
     data_sorted = sorted(data, key=lambda e: e["time"])
-    lines = [f"{e['time'][11:16]} — {e['scene']}: {e['artist']}" for e in data_sorted]
+    lines = [f"{e['time']} — {e['scene']}: {e['artist']}" for e in data_sorted]
     await message.reply("📋 Твоё избранное:\n" + "\n".join(lines), reply_markup=main_kb)
 
 @dp.callback_query_handler(lambda c: c.data.startswith("star|"))
@@ -175,8 +175,8 @@ async def reminder_loop():
                         await bot.send_message(
                             chat_id=int(user_id),
                             text=(
-                                f"🔔 Через 15 минут на сцене {entry['scene']} "
-                                f"{entry['artist']} в {entry['time'][11:16]}"
+                                f"🔔 Через 15 минут на сцене {entry['scene']} {entry['artist']} "
+                                f"в {entry['time']}"
                             )
                         )
                         entry["notified"] = True
