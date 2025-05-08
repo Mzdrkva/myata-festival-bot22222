@@ -48,7 +48,6 @@ SCENES = {
         ("2025-06-15 18:00", "The Hatters"),
     ],
     "TITANA": [
-        # 13 июня
         ("2025-06-13 16:00", "Baby Cute"),
         ("2025-06-13 16:40", "Пальцева Экспириенс"),
         ("2025-06-13 17:40", "Людмил Огурченко"),
@@ -56,8 +55,7 @@ SCENES = {
         ("2025-06-13 19:40", "OLIGARKH"),
         ("2025-06-13 20:40", "Yan Dilan"),
         ("2025-06-13 21:50", "Конец солнечных дней"),
-        ("2025-06-14 00:30", "The OM"),  # будет отображаться под 13 июня
-        # 14 июня
+        ("2025-06-14 00:30", "The OM"),
         ("2025-06-14 12:00", "Три Вторых"),
         ("2025-06-14 12:50", "El Mashe"),
         ("2025-06-14 13:40", "Inna Syberia"),
@@ -69,9 +67,7 @@ SCENES = {
         ("2025-06-14 19:40", "Стрио"),
         ("2025-06-14 20:40", "Молодость внутри"),
         ("2025-06-14 21:50", "Лолита косс"),
-        ("2025-06-14 00:30", "Бонд с кнопкой"),  # если есть
-        # 15 июня
-        ("2025-06-15 00:30", "ЗАЛЕЗ"),       # будет под 14 июня
+        ("2025-06-15 00:30", "ЗАЛЕЗ"),             # попадёт в расписание предыдущего дня
         ("2025-06-15 12:20", "Хохма"),
         ("2025-06-15 13:20", "Cardio killer"),
         ("2025-06-15 14:20", "Можем хуже"),
@@ -79,17 +75,14 @@ SCENES = {
         ("2025-06-15 16:20", "Stigmata"),
         ("2025-06-15 17:20", "Jane air"),
     ],
-    "Сцена 3": [],
-    "Сцена 4": [],
-    "Сцена 5": [],
-    "Сцена 6": [],
-    "Сцена 7": [],
+    "Сцена 3": [], "Сцена 4": [],
+    "Сцена 5": [], "Сцена 6": [], "Сцена 7": [],
 }
 
-# ====== Контекст пользователя (выбранная сцена) ======
+# ====== Контекст пользователя ======
 user_context = {}
 
-# ====== Утилиты: загрузка/сохранение ======
+# ====== Загрузка/сохранение данных ======
 def load_data():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r", encoding="utf-8") as f:
@@ -123,15 +116,16 @@ date_kb.row(
 )
 date_kb.row(KeyboardButton("◀️ Назад"))
 
-# ====== Функция получения списка для даты (с учётом «ночи») ======
+# ====== Получить расписание для даты (включая “ночные” 00:30) ======
 def get_entries_for_date(scene: str, iso_date: str):
     date_dt = datetime.fromisoformat(f"{iso_date} 00:00")
     next_dt = date_dt + timedelta(days=1)
     result = []
     for tstr, artist in SCENES[scene]:
         dt = datetime.fromisoformat(tstr)
-        # либо тот же день, либо следующая ночь до 02:00
-        if dt.date() == date_dt.date() or (dt.date() == next_dt.date() and dt.time() < time(2, 0)):
+        if dt.date() == date_dt.date() or (
+           dt.date() == next_dt.date() and dt.time() < time(2, 0)
+        ):
             result.append((tstr, artist))
     return result
 
@@ -139,19 +133,19 @@ def get_entries_for_date(scene: str, iso_date: str):
 @dp.message_handler(commands=['start'])
 async def cmd_start(message: types.Message):
     text = (
-        "🌿 Мята 2025 — это не просто фестиваль, а три дня музыки, природы и полной перезагрузки. 🎶🔥\n\n"
+        "🌿 Мята 2025 — три дня музыки, природы и перезагрузки. 🎶🔥\n\n"
         "🤖 С этим ботом ты можешь:\n"
         "– выбирать любимые выступления\n"
         "– смотреть расписание по сценам и датам\n"
         "– получать напоминания за 15 минут до старта\n\n"
-        "Выбери сцену или открой избранное:"
+        "Выбери сцену или нажми ⭐ Избранное:"
     )
     await message.reply(text, reply_markup=main_kb)
 
 @dp.message_handler(lambda m: m.text in SCENES)
 async def choose_scene(message: types.Message):
     user_context[message.from_user.id] = message.text
-    await message.reply(f"⏳ Сцена {message.text} выбрана. Теперь — выбери дату:", reply_markup=date_kb)
+    await message.reply(f"⏳ Сцена {message.text} выбрана. Выбери дату:", reply_markup=date_kb)
 
 @dp.message_handler(lambda m: m.text in ["13 июня", "14 июня", "15 июня"])
 async def choose_date(message: types.Message):
@@ -178,7 +172,7 @@ async def choose_date(message: types.Message):
 @dp.message_handler(lambda m: m.text == "◀️ Назад")
 async def back_to_main(message: types.Message):
     user_context.pop(message.from_user.id, None)
-    await message.reply("Вернулся в главное меню:", reply_markup=main_kb)
+    await message.reply("Вернулся в главное меню.", reply_markup=main_kb)
 
 @dp.message_handler(lambda m: m.text == "⭐ Избранное")
 async def show_favorites(message: types.Message):
@@ -189,7 +183,13 @@ async def show_favorites(message: types.Message):
 
     # сортировка по времени
     picks_sorted = sorted(picks, key=lambda e: e["time"])
-    lines = [f"{e['time'][11:16]} — {e['scene']}: {e['artist']}" for e in picks_sorted]
+    lines = []
+    for e in picks_sorted:
+        dt = datetime.fromisoformat(e["time"])
+        date_str = dt.strftime("%Y-%m-%d")
+        time_str = dt.strftime("%H:%M")
+        lines.append(f"{date_str} {time_str} | {e['scene']} | {e['artist']}")
+
     await message.reply("📋 Твоё избранное:\n" + "\n".join(lines), reply_markup=main_kb)
 
 @dp.callback_query_handler(lambda c: c.data.startswith("star|"))
@@ -204,7 +204,7 @@ async def handle_star(callback: types.CallbackQuery):
     picks = data.get(user_id, [])
     entry = {"scene": scene, "time": time_str, "artist": artist, "notified": False}
 
-    if not any(e["scene"] == scene and e["time"] == time_str and e["artist"] == artist for e in picks):
+    if not any(e["scene"]==scene and e["time"]==time_str for e in picks):
         picks.append(entry)
         data[user_id] = picks
         save_data(data)
@@ -212,7 +212,7 @@ async def handle_star(callback: types.CallbackQuery):
     else:
         await bot.answer_callback_query(callback.id, "✅ Уже в избранном")
 
-# ====== Фоновый таск для напоминаний ======
+# ====== Фоновый таск напоминаний ======
 async def reminder_loop():
     while True:
         now = datetime.now()
@@ -223,7 +223,7 @@ async def reminder_loop():
                 if not entry["notified"]:
                     event_time = datetime.fromisoformat(entry["time"])
                     delta = (event_time - now).total_seconds()
-                    if 0 < delta <= 15 * 60:
+                    if 0 < delta <= 15*60:
                         await bot.send_message(
                             chat_id=int(uid),
                             text=(
