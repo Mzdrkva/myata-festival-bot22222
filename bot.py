@@ -55,7 +55,7 @@ SCENES = {
         ("2025-06-13 19:40", "OLIGARKH"),
         ("2025-06-13 20:40", "Yan Dilan"),
         ("2025-06-13 21:50", "Конец солнечных дней"),
-        ("2025-06-14 00:30", "The OM"),
+        ("2025-06-14 00:30", "The OM"),   # попадёт под 13 июня
         ("2025-06-14 12:00", "Три Вторых"),
         ("2025-06-14 12:50", "El Mashe"),
         ("2025-06-14 13:40", "Inna Syberia"),
@@ -67,7 +67,7 @@ SCENES = {
         ("2025-06-14 19:40", "Стрио"),
         ("2025-06-14 20:40", "Молодость внутри"),
         ("2025-06-14 21:50", "Лолита косс"),
-        ("2025-06-15 00:30", "ЗАЛЕЗ"),             # попадёт в расписание предыдущего дня
+        ("2025-06-15 00:30", "ЗАЛЕЗ"),    # попадёт под 14 июня
         ("2025-06-15 12:20", "Хохма"),
         ("2025-06-15 13:20", "Cardio killer"),
         ("2025-06-15 14:20", "Можем хуже"),
@@ -116,7 +116,7 @@ date_kb.row(
 )
 date_kb.row(KeyboardButton("◀️ Назад"))
 
-# ====== Получить расписание для даты (включая “ночные” 00:30) ======
+# ====== Функция для фильтрации по дате (с учётом перехода полуночи) ======
 def get_entries_for_date(scene: str, iso_date: str):
     date_dt = datetime.fromisoformat(f"{iso_date} 00:00")
     next_dt = date_dt + timedelta(days=1)
@@ -181,7 +181,6 @@ async def show_favorites(message: types.Message):
     if not picks:
         return await message.reply("У тебя ещё нет избранного.", reply_markup=main_kb)
 
-    # сортировка по времени
     picks_sorted = sorted(picks, key=lambda e: e["time"])
     lines = []
     for e in picks_sorted:
@@ -204,7 +203,7 @@ async def handle_star(callback: types.CallbackQuery):
     picks = data.get(user_id, [])
     entry = {"scene": scene, "time": time_str, "artist": artist, "notified": False}
 
-    if not any(e["scene"]==scene and e["time"]==time_str for e in picks):
+    if not any(e["scene"] == scene and e["time"] == time_str and e["artist"] == artist for e in picks):
         picks.append(entry)
         data[user_id] = picks
         save_data(data)
@@ -223,7 +222,7 @@ async def reminder_loop():
                 if not entry["notified"]:
                     event_time = datetime.fromisoformat(entry["time"])
                     delta = (event_time - now).total_seconds()
-                    if 0 < delta <= 15*60:
+                    if 0 < delta <= 15 * 60:
                         await bot.send_message(
                             chat_id=int(uid),
                             text=(
@@ -238,6 +237,8 @@ async def reminder_loop():
         await asyncio.sleep(60)
 
 async def on_startup(dp: Dispatcher):
+    # удаляем возможный webhook, чтобы не было конфликта polling
+    await bot.delete_webhook(drop_pending_updates=True)
     asyncio.create_task(reminder_loop())
 
 if __name__ == "__main__":
