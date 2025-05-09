@@ -10,6 +10,14 @@ from aiogram.types import (
 from aiogram.contrib.middlewares.logging import LoggingMiddleware
 from aiogram.utils import executor
 
+# ====== Русские названия месяцев ======
+MONTH_NAMES = {
+    1: "января", 2: "февраля", 3: "марта",
+    4: "апреля", 5: "мая",     6: "июня",
+    7: "июля",   8: "августа", 9: "сентября",
+    10: "октября",11: "ноября",12: "декабря"
+}
+
 # ====== Настройки ======
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 DATA_FILE = "user_data.json"
@@ -79,7 +87,7 @@ SCENES = {
     "Сцена 5": [], "Сцена 6": [], "Сцена 7": [],
 }
 
-# Хранилище выбранной сцены
+# ====== Хранилище выбранной сцены ======
 user_context = {}
 
 # ====== Утилиты ======
@@ -95,35 +103,25 @@ def save_data(data):
 
 # ====== Клавиатуры ======
 main_kb = ReplyKeyboardMarkup(resize_keyboard=True)
-main_kb.row(
-    KeyboardButton("SIRENA"),
-    KeyboardButton("TITANA"),
-    KeyboardButton("Сцена 3"),
-    KeyboardButton("Сцена 4"),
-)
-main_kb.row(
-    KeyboardButton("Сцена 5"),
-    KeyboardButton("Сцена 6"),
-    KeyboardButton("Сцена 7"),
-    KeyboardButton("⭐ Избранное"),
-)
+main_kb.row("SIRENA", "TITANA", "Сцена 3", "Сцена 4")
+main_kb.row("Сцена 5", "Сцена 6", "Сцена 7", "⭐ Избранное")
 
 date_kb = ReplyKeyboardMarkup(resize_keyboard=True)
-date_kb.row(
-    KeyboardButton("13 июня"),
-    KeyboardButton("14 июня"),
-    KeyboardButton("15 июня"),
-)
-date_kb.row(KeyboardButton("◀️ Назад"))
+date_kb.row("13 июня", "14 июня", "15 июня")
+date_kb.row("◀️ Назад")
 
 # ====== Хэндлеры ======
 @dp.message_handler(commands=['start'])
 async def cmd_start(message: types.Message):
-    text = (
+    await message.reply(
         "🌿 Мята 2025 — три дня музыки, природы и перезагрузки. 🎶🔥\n\n"
-        "🤖 Выбери сцену или нажми ⭐ Избранное:"
+        "🤖 С этим ботом ты можешь:\n"
+        "– выбирать любимые выступления\n"
+        "– смотреть расписание по сценам и датам\n"
+        "– получать напоминания за 15 минут до старта\n\n"
+        "Выбери сцену или нажми ⭐ Избранное:",
+        reply_markup=main_kb
     )
-    await message.reply(text, reply_markup=main_kb)
 
 @dp.message_handler(lambda m: m.text in SCENES)
 async def choose_scene(message: types.Message):
@@ -135,8 +133,9 @@ async def choose_date(message: types.Message):
     scene = user_context.get(message.from_user.id)
     if not scene:
         return await message.reply("Сначала выбери сцену.", reply_markup=main_kb)
-    iso_date = f"2025-06-{int(message.text.split()[0]):02d}"
-    entries = [(t,a) for t,a in SCENES[scene] if t.startswith(iso_date)]
+    day = int(message.text.split()[0])
+    iso_date = f"2025-06-{day:02d}"
+    entries = [(t, a) for t, a in SCENES[scene] if t.startswith(iso_date)]
     if not entries:
         return await message.reply("На эту дату расписание пусто.", reply_markup=main_kb)
     kb = InlineKeyboardMarkup(row_width=2)
@@ -158,25 +157,29 @@ async def show_favorites(message: types.Message):
     picks = load_data().get(user_id, [])
     if not picks:
         return await message.reply("У тебя ещё нет избранного.", reply_markup=main_kb)
+
     lines = []
     for e in sorted(picks, key=lambda x: x["time"]):
         dt = datetime.fromisoformat(e["time"])
-        date_str = dt.strftime("%Y-%m-%d")
+        date_str = f"{dt.day} {MONTH_NAMES[dt.month]}"
         time_str = dt.strftime("%H:%M")
-        lines.append(f"{date_str} {time_str} | {e['scene']} | {e['artist']}")
+        lines.append(f"{date_str} в {time_str} | {e['scene']} | {e['artist']}")
+
     await message.reply("📋 Твоё избранное:\n" + "\n".join(lines), reply_markup=main_kb)
 
 @dp.callback_query_handler(lambda c: c.data.startswith("star|"))
 async def handle_star(callback: types.CallbackQuery):
     _, scene, iso_date, idx_str = callback.data.split("|", 3)
     idx = int(idx_str)
-    entries = [(t,a) for t,a in SCENES[scene] if t.startswith(iso_date)]
+    entries = [(t, a) for t, a in SCENES[scene] if t.startswith(iso_date)]
     time_str, artist = entries[idx]
+
     user_id = str(callback.from_user.id)
     data = load_data()
     picks = data.get(user_id, [])
     entry = {"scene": scene, "time": time_str, "artist": artist, "notified": False}
-    if not any(x["scene"]==scene and x["time"]==time_str for x in picks):
+
+    if not any(x["scene"] == scene and x["time"] == time_str for x in picks):
         picks.append(entry)
         data[user_id] = picks
         save_data(data)
@@ -184,7 +187,7 @@ async def handle_star(callback: types.CallbackQuery):
     else:
         await bot.answer_callback_query(callback.id, "✅ Уже в избранном")
 
-# ====== Фоновый таск напоминаний ======
+# ====== Таск напоминаний ======
 async def reminder_loop():
     while True:
         now = datetime.now()
@@ -198,10 +201,8 @@ async def reminder_loop():
                     if 0 < delta <= 15*60:
                         await bot.send_message(
                             chat_id=int(uid),
-                            text=(
-                                f"🔔 Через 15 минут: {entry['artist']} "
-                                f"({entry['scene']}) в {entry['time'][11:16]}"
-                            )
+                            text=(f"🔔 Через 15 минут: {entry['artist']} "
+                                  f"({entry['scene']}) в {entry['time'][11:16]}")
                         )
                         entry["notified"] = True
                         updated = True
@@ -209,8 +210,7 @@ async def reminder_loop():
             save_data(data)
         await asyncio.sleep(60)
 
-# ====== Запуск ======
-async def on_startup(dp):
+async def on_startup(dp: Dispatcher):
     asyncio.create_task(reminder_loop())
 
 if __name__ == "__main__":
