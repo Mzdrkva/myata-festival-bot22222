@@ -26,7 +26,6 @@ FAVS_FILE   = "user_data.json"
 # ====== Базовый словарь сцен ======
 DEFAULT_SCENES = {
     "SIRENA": [
-        # 13 июня, пятница
         ("2025-06-13 15:00", "SULA FRAY"),
         ("2025-06-13 16:00", "Luverance"),
         ("2025-06-13 17:00", "ГУДТАЙМС"),
@@ -35,7 +34,6 @@ DEFAULT_SCENES = {
         ("2025-06-13 20:00", "TMNV"),
         ("2025-06-13 21:00", "ХЛЕБ"),
         ("2025-06-13 22:40", "Три дня дождя"),
-        # 14 июня, суббота
         ("2025-06-14 13:00", "The Translators"),
         ("2025-06-14 14:00", "PALC"),
         ("2025-06-14 15:00", "Beautiful boys"),
@@ -46,7 +44,6 @@ DEFAULT_SCENES = {
         ("2025-06-14 20:00", "Saluki"),
         ("2025-06-14 21:00", "ZOLOTO"),
         ("2025-06-14 22:40", "АРИЯ"),
-        # 15 июня, воскресенье
         ("2025-06-15 12:00", "СмешBand"),
         ("2025-06-15 13:00", "Мультfильмы"),
         ("2025-06-15 14:00", "obraza net"),
@@ -164,10 +161,15 @@ def get_entries_for_date(scene: str, iso_date: str):
 # ====== Хэндлеры ======
 @dp.message_handler(commands=['start'])
 async def cmd_start(msg: types.Message):
-    await msg.reply(
-        "👋 Добро пожаловать в бот фестиваля «Мята 2025»!\nВыберите раздел:",
-        reply_markup=main_menu_kb()
+    welcome = (
+        "🌿 Мята 2025 — три дня музыки, природы и перезагрузки. 🎶🔥\n\n"
+        "🤖 С этим ботом ты можешь:\n"
+        "– выбирать любимые выступления\n"
+        "– смотреть расписание по сценам и датам\n"
+        "– получать напоминания за 15 минут до старта\n"
+        "– просматривать ответы на часто задаваемые вопросы"
     )
+    await msg.reply(welcome, reply_markup=main_menu_kb())
 
 @dp.message_handler(lambda m: m.text == "FAQ")
 async def cmd_faq(msg: types.Message):
@@ -230,7 +232,6 @@ async def handle_faq(msg: types.Message):
         )
         await msg.reply(text, reply_markup=faq_kb())
     else:
-        # можете добавить тексты для других тем FAQ тут
         await msg.reply("Информация скоро появится.", reply_markup=faq_kb())
 
 @dp.message_handler(lambda m: m.text == "Расписание сцен")
@@ -249,8 +250,8 @@ async def cmd_favs(msg: types.Message):
         date = f"{dt.day} {MONTH_NAMES[dt.month]}"
         tm   = dt.strftime("%H:%M")
         lines.append(f"{date} в {tm} | {e['scene']} | {e['artist']}")
-    await msg.reply("📋 Ваше избранное:\n" + "\n".join(lines),
-                    reply_markup=main_menu_kb())
+    await msg.reply("📋 Ваше избранное:\n" + "\n".join(lines
+)), reply_markup=main_menu_kb())
 
 @dp.message_handler(lambda m: m.text in SCENES)
 async def cmd_choose_scene(msg: types.Message):
