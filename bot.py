@@ -1,4 +1,3 @@
-```python
 import os
 import json
 import asyncio
@@ -305,4 +304,3 @@ async def on_startup(dp: Dispatcher):
 
 if __name__ == "__main__":
     executor.start_polling(dp, skip_updates=True, reset_webhook=True, on_startup=on_startup)
-```
