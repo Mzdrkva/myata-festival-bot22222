@@ -1,9 +1,0 @@
-services:
-  - type: web
-    name: myata-bot
-    env: python
-    buildCommand: ""
-    startCommand: "python bot.py"
-    envVars:
-      - key: BOT_TOKEN
-        value: 7651745731:AAGrY52hzKUVNJrCniro4uozNKtG1YCTPKU
