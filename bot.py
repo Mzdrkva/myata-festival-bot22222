@@ -203,13 +203,14 @@ async def choose_date(message: types.Message):
         return await message.reply("На эту дату расписание пусто.", 
                                    reply_markup=schedule_kb)
 
-    kb = InlineKeyboardMarkup(row_width=2)
-    for idx, (tstr, artist) in enumerate(entries):
-        time_only = tstr[11:16]
-        kb.insert(InlineKeyboardButton(
-            f"{time_only} — {artist}",
-            callback_data=f"star|{scene}|{iso_date}|{idx}"
-        ))
+kb = InlineKeyboardMarkup()
+for idx, (tstr, artist) in enumerate(entries):
+    kb.row(
+      InlineKeyboardButton(
+        f"{tstr[11:16]} — {artist}",
+        callback_data=f"star|{scene}|{iso_date}|{idx}"
+      )
+    )
     await message.reply(f"🗓 Расписание «{scene}» на {message.text}:", 
                         reply_markup=kb)
 
