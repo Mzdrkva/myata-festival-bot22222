@@ -31,12 +31,12 @@ dp.middleware.setup(LoggingMiddleware())
 SCENES = {
     "SIRENA": [
         ("2025-06-13 15:00", "SULA FRAY"),
-        # … полный список для SIRENA …
+        # ... полный список SIRENA ...
         ("2025-06-15 18:00", "The Hatters"),
     ],
     "TITANA": [
         ("2025-06-13 16:00", "Baby Cute"),
-        # … полный список для TITANA …
+        # ... полный список TITANA ...
         ("2025-06-15 17:20", "Jane air"),
     ],
     "Сцена 3": [], "Сцена 4": [],
@@ -69,9 +69,9 @@ date_kb = ReplyKeyboardMarkup(resize_keyboard=True)
 date_kb.row("13 июня", "14 июня", "15 июня")
 date_kb.row("◀️ Главное меню")
 
+# Убрали "Расписание сцен" чтобы не конфликтовать с основным маршрутом
 faq_options = [
     "О фестивале",
-    "Расписание сцен",
     "Обмен билетов на браслеты",
     "Место на парковке",
     "Место под палатку",
@@ -83,10 +83,10 @@ faq_options = [
 ]
 faq_kb = ReplyKeyboardMarkup(resize_keyboard=True)
 for i in range(0, len(faq_options), 2):
-    faq_kb.row(*(KeyboardButton(text) for text in faq_options[i:i+2]))
+    faq_kb.row(*(KeyboardButton(txt) for txt in faq_options[i:i+2]))
 faq_kb.row(KeyboardButton("◀️ Главное меню"))
 
-# ====== Фильтрация расписания по дате (учёт “ночи”) ======
+# ====== Фильтрация расписания по дате (учёт ночных 00:30) ======
 def get_entries_for_date(scene: str, iso_date: str):
     date_dt = datetime.fromisoformat(f"{iso_date} 00:00")
     next_dt = date_dt + timedelta(days=1)
@@ -134,10 +134,12 @@ async def show_favorites(message: types.Message):
 @dp.message_handler(lambda m: m.text in SCENES)
 async def choose_scene(message: types.Message):
     user_context[message.from_user.id] = message.text
-    await message.reply(f"⏳ Сцена «{message.text}» выбрана. Выбери дату:",
-                        reply_markup=date_kb)
+    await message.reply(
+        f"⏳ Сцена «{message.text}» выбрана. Выбери дату:",
+        reply_markup=date_kb
+    )
 
-@dp.message_handler(lambda m: m.text in ["13 июня", "14 июня", "15 июня"])
+@dp.message_handler(lambda m: m.text in ["13 июня","14 июня","15 июня"])
 async def choose_date(message: types.Message):
     scene = user_context.get(message.from_user.id)
     if not scene:
@@ -149,7 +151,6 @@ async def choose_date(message: types.Message):
     if not entries:
         return await message.reply("На эту дату расписание пусто.", reply_markup=schedule_kb)
 
-    # Делаем каждую кнопку на всю ширину
     kb = InlineKeyboardMarkup(row_width=1)
     for idx, (tstr, artist) in enumerate(entries):
         kb.add(InlineKeyboardButton(
@@ -188,7 +189,6 @@ async def back_to_main(message: types.Message):
 async def handle_faq(message: types.Message):
     answers = {
         "О фестивале": "«Мята 2025» — это трёхдневный фестиваль...",
-        "Расписание сцен": "Выбери «Расписание сцен» в главном меню.",
         "Обмен билетов на браслеты": "Обмен у входа с 10:00 до 22:00.",
         "Место на парковке": "Парковка возле главного въезда.",
         "Место под палатку": "Зона кемпинга рядом с озером.",
