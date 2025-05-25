@@ -1,7 +1,8 @@
 import os
 import json
 import asyncio
-from datetime import datetime, time, timedelta
+import time
+from datetime import datetime, timedelta, time as dtime
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import (
@@ -10,6 +11,7 @@ from aiogram.types import (
 )
 from aiogram.contrib.middlewares.logging import LoggingMiddleware
 from aiogram.utils import executor
+from aiogram.utils.exceptions import TerminatedByOtherGetUpdates
 
 # ====== Русские названия месяцев ======
 MONTH_NAMES = {
@@ -168,6 +170,48 @@ def faq_kb():
     kb.row("◀️ Главное меню")
     return kb
 
+# ====== Тексты FAQ ======
+FAQ_TEXTS = {
+    "О фестивале": (
+        "Фестиваль «Дикая Мята» — крупнейший независимый музыкальный опен-эйр.\n"
+        "Даты проведения: Заезд — с 18:00 12 июня, программа фестиваля — 13-15 июня.\n"
+        "Место проведения: Тульская область, поселок Бунырево.\n\n"
+        "В 2025 году зрителей на 7 сценах ждет более 120 концертов и dj-сетов. Рок, инди, фолк, "
+        "альтернатива, фанк, джаз, электроника — мультиформатная «Дикая Мята» представляет артистов всех "
+        "актуальных жанров.\n\n"
+        "На фестивале выступят THE HATTERS, Три дня дождя, ZOLOTO, АРИЯ, ХЛЕБ, SALUKI, polnalyubvi, "
+        "DRUMMATIX, Заточка, БАЗАР, Jane Air, TMNV, Пётр Налич, ГУДТАЙМС, Бонд с кнопкой, СмешBand, "
+        "Luverance, Кирпичи Big Band, The OM, MONOLYT (IL), Stigmata, мытищи в огне, PALC, OLIGARKH, "
+        "Мультfильмы, Драгни, Beautiful boys, хмыров, Manapart, Конец солнечных дней, kamilla robertovna, "
+        "Cardio killer, Sula fray, obraza net, 3333, Собачий Lie, Хохма, The Translators, Манго буст, "
+        "Yan Dilan, Бюро, Молодость внутри, Пальцева Экспириенс, Людмил Огурченко, Breaking system, "
+        "Brodsky, Uncle pecos, Стрио, Juzeppe Junior, Лолита косс, Остыл, Melekess, El Mashe, "
+        "Дедовский свитер, Baby Cute, Антон Прокофьев, Mazzltoff, Tabasco Band, Дисциплина безбольной биты и другие.\n\n"
+        "«Дикая Мята» по праву считается самым комфортным опен-эйром страны: организованная парковка, "
+        "бесплатная питьевая вода и душевые с горячей водой, дорожки из плитки, освещенные палаточные "
+        "кемпинги с размеченными местами, комната матери и ребенка, бассейн, видовой ресторан и арт-амбар, "
+        "sup-станция и лаундж-зоны.\n\n"
+        "Фудкорт предлагает кухни мира на любой вкус и кошелек, вегетарианскую зону и перголу от шеф-поваров.\n\n"
+        "Программа развлечений:\n"
+        "— Green Age: йога, экстатик дэнс, арт-медитации, мастер-классы, лекции.\n"
+        "— Бьюти-зона: брейдинга, макияж, барбершоп.\n"
+        "— Территория детства: Детская сцена «Ариэль», карусели, аттракционы, мастер-классы, аниматоры, "
+        "мультгерои от «Мельницы».\n"
+        "— Ярмарка хэндмейда и авторской одежды.\n"
+        "— Спортивная площадка: воркаут, пляжный волейбол.\n"
+        "— Призы и лаундж-зоны от партнеров.\n\n"
+        "Фестиваль «Дикая Мята» — лето, музыка и любовь! Это будет легендарно!"
+    ),
+    "Обмен билетов на браслеты": "Текст по теме «Обмен билетов на браслеты»...",
+    "Место на парковке": "Текст по теме «Место на парковке»...",
+    "Место под палатку": "Текст по теме «Место под палатку»...",
+    "Карта Фестиваля": "Текст по теме «Карта Фестиваля»...",
+    "Расписание работы душевых": "Текст по теме «Расписание работы душевых»...",
+    "Расписание зон с кипятком": "Текст по теме «Расписание зон с кипятком»...",
+    "Трансферы": "Текст по теме «Трансферы»...",
+    "Расписание электричек": "Текст по теме «Расписание электричек»...",
+}
+
 # ====== Помощник по расписанию ======
 def get_entries_for_date(scene: str, iso_date: str):
     date_dt = datetime.fromisoformat(f"{iso_date} 00:00")
@@ -175,8 +219,7 @@ def get_entries_for_date(scene: str, iso_date: str):
     result = []
     for tstr, artist in SCENES.get(scene, []):
         dt = datetime.fromisoformat(tstr)
-        # отнести поздние выступления (<02:00) к предыдущему дню
-        if dt.date() == date_dt.date() or (dt.date() == next_dt.date() and dt.time() < time(2,0)):
+        if dt.date() == date_dt.date() or (dt.date() == next_dt.date() and dt.time() < dtime(2,0)):
             result.append((tstr, artist))
     return result
 
@@ -189,8 +232,7 @@ async def reminder_loop():
             for e in picks:
                 if not e.get("notified", False):
                     perf_dt = datetime.fromisoformat(e["time"])
-                    # поправка на выступления после полуночи
-                    if perf_dt.time() < time(2,0):
+                    if perf_dt.time() < dtime(2,0):
                         perf_dt -= timedelta(days=1)
                     delta = (perf_dt - now).total_seconds()
                     if 0 < delta <= 15*60:
@@ -227,11 +269,9 @@ async def cmd_start(msg: types.Message):
 async def cmd_faq(msg: types.Message):
     await msg.reply("❓ FAQ — выберите тему:", reply_markup=faq_kb())
 
-@dp.message_handler(lambda m: m.text == "О фестивале")
-async def faq_about(msg: types.Message):
-    # Здесь ваш длинный текст от заказчика
-    text = "Полный текст про фестиваль..."
-    await msg.reply(text, reply_markup=faq_kb())
+@dp.message_handler(lambda m: m.text in FAQ_TEXTS)
+async def faq_answer(msg: types.Message):
+    await msg.reply(FAQ_TEXTS[msg.text], reply_markup=faq_kb())
 
 @dp.message_handler(lambda m: m.text == "Расписание сцен")
 async def cmd_schedule(msg: types.Message):
@@ -246,7 +286,6 @@ async def cmd_favs(msg: types.Message):
     lines = []
     for e in sorted(picks, key=lambda x: x["time"]):
         dt = datetime.fromisoformat(e["time"])
-        # поправка на полуночные — уже в reminder_loop
         date = f"{dt.day} {MONTH_NAMES[dt.month]}"
         tm   = dt.strftime("%H:%M")
         lines.append(f"{date} в {tm} | {e['scene']} | {e['artist']}")
@@ -269,20 +308,20 @@ async def cmd_choose_date(msg: types.Message):
     if not entries:
         return await msg.reply("На эту дату нет выступлений.", reply_markup=schedule_menu_kb())
     kb = InlineKeyboardMarkup(row_width=1)
-    for idx, (tstr, artist) in enumerate(entries):
-        kb.add(InlineKeyboardButton(f"{tstr[11:16]} — {artist}",
-                                    callback_data=f"fav|{scene}|{tstr}"))
+    for tstr, artist in entries:
+        kb.add(InlineKeyboardButton(f"{tstr[11:16]} — {artist}", callback_data=f"fav|{scene}|{tstr}"))
     await msg.reply(f"Расписание «{scene}» на {msg.text}:", reply_markup=kb)
 
 @dp.callback_query_handler(lambda c: c.data.startswith("fav|"))
 async def cb_fav(cq: types.CallbackQuery):
     _, scene, tstr = cq.data.split("|", 2)
+    artist = next(a for dt, a in SCENES.get(scene, []) if dt == tstr)
     uid = str(cq.from_user.id)
     FAVS.setdefault(uid, [])
     if not any(x["scene"] == scene and x["time"] == tstr for x in FAVS[uid]):
-        FAVS[uid].append({"scene": scene, "time": tstr, "artist": dict(get_entries_for_date(scene, tstr[:10]))[tstr] if False else tstr, "artist": next(a for dt,a in SCENES[scene] if dt==tstr), "notified": False})
+        FAVS[uid].append({"scene": scene, "time": tstr, "artist": artist, "notified": False})
         save_json(FAVS_FILE, FAVS)
-        await bot.answer_callback_query(cq.id, f"⭐ Добавлено")
+        await bot.answer_callback_query(cq.id, f"⭐ Добавлено «{artist}»")
     else:
         await bot.answer_callback_query(cq.id, "✅ Уже в избранном")
 
@@ -350,10 +389,23 @@ async def cmd_remove_perf(msg: types.Message):
     save_json(SCENES_FILE, SCENES)
     await msg.reply(f"✅ Удалено из «{scene}»: {dt_str} — {artist}")
 
-# ====== Запуск ======
+# ====== Startup и polling ======
 async def on_startup(dp: Dispatcher):
     await bot.delete_webhook(drop_pending_updates=True)
     asyncio.create_task(reminder_loop())
 
 if __name__ == "__main__":
-    executor.start_polling(dp, skip_updates=True, reset_webhook=True, on_startup=on_startup)
+    while True:
+        try:
+            executor.start_polling(
+                dp,
+                skip_updates=True,
+                on_startup=on_startup
+            )
+            break
+        except TerminatedByOtherGetUpdates:
+            # Сброс webhook и повтор
+            asyncio.get_event_loop().run_until_complete(
+                bot.delete_webhook(drop_pending_updates=True)
+            )
+            time.sleep(1)
