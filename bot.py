@@ -24,9 +24,9 @@ MONTH_NAMES = {
 # ====== Файлы данных и ресурсы ======
 SCENES_FILE   = "scenes.json"
 FAVS_FILE     = "user_data.json"
-WELCOME_IMAGE = "welcome.jpg"  # Положите этот файл рядом с bot.py
+WELCOME_IMAGE = "welcome.jpg"
 
-# ====== Базовый словарь сцен ======
+# ====== Стартовое расписание сцен ======
 DEFAULT_SCENES = {
     "SIRENA": [
         ("2025-06-13 15:00", "SULA FRAY"),
@@ -113,7 +113,7 @@ DEFAULT_SCENES = {
 # ====== Инициализация бота ======
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 bot = Bot(token=BOT_TOKEN)
-dp  = Dispatcher(bot)
+dp = Dispatcher(bot)
 dp.middleware.setup(LoggingMiddleware())
 
 # ====== JSON утилиты ======
@@ -132,8 +132,9 @@ def save_json(path, data):
 
 # ====== Загрузка/сохранение данных ======
 SCENES = load_json(SCENES_FILE, DEFAULT_SCENES)
-FAVS   = load_json(FAVS_FILE, {})
+FAVS = load_json(FAVS_FILE, {})
 
+# ====== Контекст пользователя ======
 user_context = {}
 
 # ====== Клавиатуры ======
@@ -212,18 +213,18 @@ FAQ_TEXTS = {
     "Расписание электричек": "Текст по теме «Расписание электричек»...",
 }
 
-# ====== Помощник по расписанию ======
+# ====== Вспомогательная функция по расписанию ======
 def get_entries_for_date(scene: str, iso_date: str):
     date_dt = datetime.fromisoformat(f"{iso_date} 00:00")
     next_dt = date_dt + timedelta(days=1)
     result = []
     for tstr, artist in SCENES.get(scene, []):
         dt = datetime.fromisoformat(tstr)
-        if dt.date() == date_dt.date() or (dt.date() == next_dt.date() and dt.time() < dtime(2,0)):
+        if dt.date() == date_dt.date() or (dt.date() == next_dt.date() and dt.time() < dtime(2, 0)):
             result.append((tstr, artist))
     return result
 
-# ====== Фоновая задача напоминаний ======
+# ====== Фоновая задача: напоминания за 15 минут ======
 async def reminder_loop():
     while True:
         now = datetime.now()
@@ -232,10 +233,10 @@ async def reminder_loop():
             for e in picks:
                 if not e.get("notified", False):
                     perf_dt = datetime.fromisoformat(e["time"])
-                    if perf_dt.time() < dtime(2,0):
+                    if perf_dt.time() < dtime(2, 0):
                         perf_dt -= timedelta(days=1)
                     delta = (perf_dt - now).total_seconds()
-                    if 0 < delta <= 15*60:
+                    if 0 < delta <= 15 * 60:
                         await bot.send_message(
                             int(uid),
                             f"🔔 Через 15 минут: {e['artist']} ({e['scene']}) в {perf_dt.strftime('%H:%M')}"
@@ -287,7 +288,7 @@ async def cmd_favs(msg: types.Message):
     for e in sorted(picks, key=lambda x: x["time"]):
         dt = datetime.fromisoformat(e["time"])
         date = f"{dt.day} {MONTH_NAMES[dt.month]}"
-        tm   = dt.strftime("%H:%M")
+        tm = dt.strftime("%H:%M")
         lines.append(f"{date} в {tm} | {e['scene']} | {e['artist']}")
     await msg.reply("📋 Ваше избранное:\n" + "\n".join(lines),
                     reply_markup=main_menu_kb())
@@ -389,12 +390,14 @@ async def cmd_remove_perf(msg: types.Message):
     save_json(SCENES_FILE, SCENES)
     await msg.reply(f"✅ Удалено из «{scene}»: {dt_str} — {artist}")
 
-# ====== Startup и polling ======
+# ====== Запуск ======
 async def on_startup(dp: Dispatcher):
+    # сброс вебхука и удаление старых апдейтов
     await bot.delete_webhook(drop_pending_updates=True)
     asyncio.create_task(reminder_loop())
 
 if __name__ == "__main__":
+    # в цикле убираем конфликт TerminatedByOtherGetUpdates и повторяем polling
     while True:
         try:
             executor.start_polling(
@@ -404,7 +407,6 @@ if __name__ == "__main__":
             )
             break
         except TerminatedByOtherGetUpdates:
-            # Сброс webhook и повтор
             asyncio.get_event_loop().run_until_complete(
                 bot.delete_webhook(drop_pending_updates=True)
             )
