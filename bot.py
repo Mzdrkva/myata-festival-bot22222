@@ -24,7 +24,14 @@ MONTH_NAMES = {
 # ====== Файлы данных и ресурсы ======
 SCENES_FILE   = "scenes.json"
 FAVS_FILE     = "user_data.json"
-WELCOME_IMAGE = "welcome.jpg"
+WELCOME_IMAGE = "welcome.jpg"  # рядом с bot.py
+
+# ====== Администраторы (Telegram IDs) ======
+# Задайте в .env переменную ADMIN_IDS в виде "12345678,87654321"
+if os.getenv("ADMIN_IDS"):
+    ADMIN_IDS = [int(x) for x in os.getenv("ADMIN_IDS").split(",")]
+else:
+    ADMIN_IDS = []
 
 # ====== Стартовое расписание сцен ======
 DEFAULT_SCENES = {
@@ -130,11 +137,11 @@ def save_json(path, data):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-# ====== Загрузка/сохранение данных ======
+# ====== Загрузка данных ======
 SCENES = load_json(SCENES_FILE, DEFAULT_SCENES)
-FAVS = load_json(FAVS_FILE, {})
+FAVS   = load_json(FAVS_FILE, {})
 
-# ====== Контекст пользователя ======
+# ====== Контекст для выбора сцены ======
 user_context = {}
 
 # ====== Клавиатуры ======
@@ -177,31 +184,7 @@ FAQ_TEXTS = {
         "Фестиваль «Дикая Мята» — крупнейший независимый музыкальный опен-эйр.\n"
         "Даты проведения: Заезд — с 18:00 12 июня, программа фестиваля — 13-15 июня.\n"
         "Место проведения: Тульская область, поселок Бунырево.\n\n"
-        "В 2025 году зрителей на 7 сценах ждет более 120 концертов и dj-сетов. Рок, инди, фолк, "
-        "альтернатива, фанк, джаз, электроника — мультиформатная «Дикая Мята» представляет артистов всех "
-        "актуальных жанров.\n\n"
-        "На фестивале выступят THE HATTERS, Три дня дождя, ZOLOTO, АРИЯ, ХЛЕБ, SALUKI, polnalyubvi, "
-        "DRUMMATIX, Заточка, БАЗАР, Jane Air, TMNV, Пётр Налич, ГУДТАЙМС, Бонд с кнопкой, СмешBand, "
-        "Luverance, Кирпичи Big Band, The OM, MONOLYT (IL), Stigmata, мытищи в огне, PALC, OLIGARKH, "
-        "Мультfильмы, Драгни, Beautiful boys, хмыров, Manapart, Конец солнечных дней, kamilla robertovna, "
-        "Cardio killer, Sula fray, obraza net, 3333, Собачий Lie, Хохма, The Translators, Манго буст, "
-        "Yan Dilan, Бюро, Молодость внутри, Пальцева Экспириенс, Людмил Огурченко, Breaking system, "
-        "Brodsky, Uncle pecos, Стрио, Juzeppe Junior, Лолита косс, Остыл, Melekess, El Mashe, "
-        "Дедовский свитер, Baby Cute, Антон Прокофьев, Mazzltoff, Tabasco Band, Дисциплина безбольной биты и другие.\n\n"
-        "«Дикая Мята» по праву считается самым комфортным опен-эйром страны: организованная парковка, "
-        "бесплатная питьевая вода и душевые с горячей водой, дорожки из плитки, освещенные палаточные "
-        "кемпинги с размеченными местами, комната матери и ребенка, бассейн, видовой ресторан и арт-амбар, "
-        "sup-станция и лаундж-зоны.\n\n"
-        "Фудкорт предлагает кухни мира на любой вкус и кошелек, вегетарианскую зону и перголу от шеф-поваров.\n\n"
-        "Программа развлечений:\n"
-        "— Green Age: йога, экстатик дэнс, арт-медитации, мастер-классы, лекции.\n"
-        "— Бьюти-зона: брейдинга, макияж, барбершоп.\n"
-        "— Территория детства: Детская сцена «Ариэль», карусели, аттракционы, мастер-классы, аниматоры, "
-        "мультгерои от «Мельницы».\n"
-        "— Ярмарка хэндмейда и авторской одежды.\n"
-        "— Спортивная площадка: воркаут, пляжный волейбол.\n"
-        "— Призы и лаундж-зоны от партнеров.\n\n"
-        "Фестиваль «Дикая Мята» — лето, музыка и любовь! Это будет легендарно!"
+        "В 2025 году зрителей на 7 сценах ждёт более 120 концертов и DJ-сетов..."
     ),
     "Обмен билетов на браслеты": "Текст по теме «Обмен билетов на браслеты»...",
     "Место на парковке": "Текст по теме «Место на парковке»...",
@@ -213,18 +196,18 @@ FAQ_TEXTS = {
     "Расписание электричек": "Текст по теме «Расписание электричек»...",
 }
 
-# ====== Вспомогательная функция по расписанию ======
+# ====== Вспомогательная ф-ция для расписания ======
 def get_entries_for_date(scene: str, iso_date: str):
     date_dt = datetime.fromisoformat(f"{iso_date} 00:00")
     next_dt = date_dt + timedelta(days=1)
     result = []
     for tstr, artist in SCENES.get(scene, []):
         dt = datetime.fromisoformat(tstr)
-        if dt.date() == date_dt.date() or (dt.date() == next_dt.date() and dt.time() < dtime(2, 0)):
+        if dt.date() == date_dt.date() or (dt.date() == next_dt.date() and dt.time() < dtime(2,0)):
             result.append((tstr, artist))
     return result
 
-# ====== Фоновая задача: напоминания за 15 минут ======
+# ====== Фоновая задача (напоминания) ======
 async def reminder_loop():
     while True:
         now = datetime.now()
@@ -233,10 +216,10 @@ async def reminder_loop():
             for e in picks:
                 if not e.get("notified", False):
                     perf_dt = datetime.fromisoformat(e["time"])
-                    if perf_dt.time() < dtime(2, 0):
+                    if perf_dt.time() < dtime(2,0):
                         perf_dt -= timedelta(days=1)
                     delta = (perf_dt - now).total_seconds()
-                    if 0 < delta <= 15 * 60:
+                    if 0 < delta <= 15*60:
                         await bot.send_message(
                             int(uid),
                             f"🔔 Через 15 минут: {e['artist']} ({e['scene']}) в {perf_dt.strftime('%H:%M')}"
@@ -250,6 +233,11 @@ async def reminder_loop():
 # ====== Хэндлеры ======
 @dp.message_handler(commands=['start'])
 async def cmd_start(msg: types.Message):
+    # Регистрируем пользователя для broadcast и избранного
+    uid = str(msg.from_user.id)
+    FAVS.setdefault(uid, [])
+    save_json(FAVS_FILE, FAVS)
+
     welcome = (
         "🌿 Мята 2025 — три дня музыки, природы и перезагрузки. 🎶🔥\n\n"
         "🤖 С этим ботом ты можешь:\n"
@@ -288,7 +276,7 @@ async def cmd_favs(msg: types.Message):
     for e in sorted(picks, key=lambda x: x["time"]):
         dt = datetime.fromisoformat(e["time"])
         date = f"{dt.day} {MONTH_NAMES[dt.month]}"
-        tm = dt.strftime("%H:%M")
+        tm   = dt.strftime("%H:%M")
         lines.append(f"{date} в {tm} | {e['scene']} | {e['artist']}")
     await msg.reply("📋 Ваше избранное:\n" + "\n".join(lines),
                     reply_markup=main_menu_kb())
@@ -333,6 +321,8 @@ async def cmd_back(msg: types.Message):
 # ====== Админ-команды ======
 @dp.message_handler(commands=['add_scene'])
 async def cmd_add_scene(msg: types.Message):
+    if msg.from_user.id not in ADMIN_IDS:
+        return
     parts = msg.text.split(maxsplit=1)
     if len(parts) < 2:
         return await msg.reply("Используйте: /add_scene Название_сцены")
@@ -345,6 +335,8 @@ async def cmd_add_scene(msg: types.Message):
 
 @dp.message_handler(commands=['remove_scene'])
 async def cmd_remove_scene(msg: types.Message):
+    if msg.from_user.id not in ADMIN_IDS:
+        return
     parts = msg.text.split(maxsplit=1)
     if len(parts) < 2:
         return await msg.reply("Используйте: /remove_scene Название_сцены")
@@ -357,6 +349,8 @@ async def cmd_remove_scene(msg: types.Message):
 
 @dp.message_handler(commands=['add_perf'])
 async def cmd_add_perf(msg: types.Message):
+    if msg.from_user.id not in ADMIN_IDS:
+        return
     try:
         _, payload = msg.text.split(maxsplit=1)
         scene, dt_str, artist = [s.strip() for s in payload.split('|', 2)]
@@ -373,6 +367,8 @@ async def cmd_add_perf(msg: types.Message):
 
 @dp.message_handler(commands=['remove_perf'])
 async def cmd_remove_perf(msg: types.Message):
+    if msg.from_user.id not in ADMIN_IDS:
+        return
     try:
         _, payload = msg.text.split(maxsplit=1)
         scene, dt_str, artist = [s.strip() for s in payload.split('|', 2)]
@@ -390,21 +386,32 @@ async def cmd_remove_perf(msg: types.Message):
     save_json(SCENES_FILE, SCENES)
     await msg.reply(f"✅ Удалено из «{scene}»: {dt_str} — {artist}")
 
-# ====== Запуск ======
+@dp.message_handler(commands=['broadcast'])
+async def cmd_broadcast(msg: types.Message):
+    if msg.from_user.id not in ADMIN_IDS:
+        return
+    parts = msg.text.split(maxsplit=1)
+    if len(parts) < 2:
+        return await msg.reply("Использование: /broadcast Текст сообщения")
+    text = parts[1].strip()
+    count = 0
+    for uid in FAVS.keys():
+        try:
+            await bot.send_message(int(uid), f"📢 Сообщение от организаторов:\n{text}")
+            count += 1
+        except:
+            pass
+    await msg.reply(f"✅ Отправлено сообщения {count} пользователям.")
+
+# ====== Запуск и обработка conflict ======
 async def on_startup(dp: Dispatcher):
-    # сброс вебхука и удаление старых апдейтов
     await bot.delete_webhook(drop_pending_updates=True)
     asyncio.create_task(reminder_loop())
 
 if __name__ == "__main__":
-    # в цикле убираем конфликт TerminatedByOtherGetUpdates и повторяем polling
     while True:
         try:
-            executor.start_polling(
-                dp,
-                skip_updates=True,
-                on_startup=on_startup
-            )
+            executor.start_polling(dp, skip_updates=True, on_startup=on_startup)
             break
         except TerminatedByOtherGetUpdates:
             asyncio.get_event_loop().run_until_complete(
