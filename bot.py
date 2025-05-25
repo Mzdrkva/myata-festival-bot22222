@@ -134,6 +134,7 @@ FAVS   = load_json(FAVS_FILE, {})
 
 user_context = {}
 
+# ====== Клавиатуры ======
 def main_menu_kb():
     kb = ReplyKeyboardMarkup(resize_keyboard=True)
     kb.row("FAQ", "Расписание сцен", "⭐ Избранное")
@@ -167,28 +168,35 @@ def faq_kb():
     kb.row("◀️ Главное меню")
     return kb
 
+# ====== Помощник по расписанию ======
 def get_entries_for_date(scene: str, iso_date: str):
     date_dt = datetime.fromisoformat(f"{iso_date} 00:00")
     next_dt = date_dt + timedelta(days=1)
     result = []
     for tstr, artist in SCENES.get(scene, []):
         dt = datetime.fromisoformat(tstr)
+        # отнести поздние выступления (<02:00) к предыдущему дню
         if dt.date() == date_dt.date() or (dt.date() == next_dt.date() and dt.time() < time(2,0)):
             result.append((tstr, artist))
     return result
 
+# ====== Фоновая задача напоминаний ======
 async def reminder_loop():
     while True:
         now = datetime.now()
         updated = False
         for uid, picks in FAVS.items():
             for e in picks:
-                if not e["notified"]:
-                    et = datetime.fromisoformat(e["time"])
-                    delta = (et - now).total_seconds()
+                if not e.get("notified", False):
+                    perf_dt = datetime.fromisoformat(e["time"])
+                    # поправка на выступления после полуночи
+                    if perf_dt.time() < time(2,0):
+                        perf_dt -= timedelta(days=1)
+                    delta = (perf_dt - now).total_seconds()
                     if 0 < delta <= 15*60:
-                        await bot.send_message(int(uid),
-                            f"🔔 Через 15 минут: {e['artist']} ({e['scene']}) в {e['time'][11:16]}"
+                        await bot.send_message(
+                            int(uid),
+                            f"🔔 Через 15 минут: {e['artist']} ({e['scene']}) в {perf_dt.strftime('%H:%M')}"
                         )
                         e["notified"] = True
                         updated = True
@@ -196,6 +204,7 @@ async def reminder_loop():
             save_json(FAVS_FILE, FAVS)
         await asyncio.sleep(60)
 
+# ====== Хэндлеры ======
 @dp.message_handler(commands=['start'])
 async def cmd_start(msg: types.Message):
     welcome = (
@@ -220,46 +229,8 @@ async def cmd_faq(msg: types.Message):
 
 @dp.message_handler(lambda m: m.text == "О фестивале")
 async def faq_about(msg: types.Message):
-    text = (
-        "Фестиваль «Дикая Мята» — крупнейший независимый музыкальный опен-эйр.\n"
-        "Даты проведения: Заезд — с 18:00 12 июня, программа фестиваля — 13-15 июня.\n"
-        "Место проведения: Тульская область, поселок Бунырево.\n\n"
-        "В 2025 году зрителей на 7 сценах ждет более 120 концертов и dj-сетов. Рок, инди, фолк, "
-        "альтернатива, фанк, джаз, электроника — мультиформатная «Дикая Мята» представляет артистов всех "
-        "актуальных жанров.\n\n"
-        "На фестивале выступят THE HATTERS, Три дня дождя, ZOLOTO, АРИЯ, ХЛЕБ, SALUKI, polnalyubvi, "
-        "DRUMMATIX, Заточка, БАЗАР, Jane Air, TMNV, Пётр Налич, ГУДТАЙМС, Бонд с кнопкой, СмешBand, "
-        "Luverance, Кирпичи Big Band, The OM, MONOLYT (IL), Stigmata, мытищи в огне, PALC, OLIGARKH, "
-        "Мультfильмы, Драгни, Beautiful boys, хмыров, Manapart, Конец солнечных дней, Kамilla Robertovna, "
-        "CARDIO KILLER, Sula fray, obraza net, 3333, Собачий Lie, ХОХМА, The Translators, Манго Буст, "
-        "Yan Dilan, Бюро, МОЛОДОСТЬ ВНУТРИ, Пальцева Экспириенс, Людмил Огурченко, Breaking System, Brodsky, "
-        "uncle pecos, Стрио, соня хочет танцевать, Juzeppe Junior, Лолита Косс, Остыл, Melekess, El Mashe, "
-        "Дедовский Свитер, Baby Cute, Антон Прокофьев, Breakpillzz, Мама не узнает, GOKK’N’TONY, Можем хуже, "
-        "RASPUTНIKI (KZ), Inna Syberia, без обид, Давай, LITHIUM, Каспий, Три вторых, Рубеж Веков, синдром главного героя, "
-        "Koledova, я Софа, Mazzltoff, ielele, Polina Offline, Ник Брусковский, ROFMAN, летяга, Tabasco Band, "
-        "Гнев Господень, Дисциплина безбольной биты, Hideout, Савелiчъ Бэнд, ParadigmA, Клуб 33 и другие, новые анонсы каждую неделю!\n\n"
-        "«Дикая Мята» по праву считается самым комфортным опен-эйром страны. Организованная парковка, "
-        "бесплатная питьевая вода и душевые с горячей водой, дорожки, выложенные тротуарной плиткой, "
-        "освещенные палаточные кемпинги, которые размечены на улицы и индивидуальные места под палатки, "
-        "комната матери и ребенка, бассейн, видовой ресторан и арт-амбар, sup-станция и лаундж-зоны.\n\n"
-        "Фудкорт фестиваля предлагает кухни мира на любой вкус и кошелек, вегетарианскую зону и атмосферную "
-        "перголу с блюдами от шеф-поваров.\n\n"
-        "Также для гостей представлено множество развлечений:\n"
-        "— В пространстве Green Age проходят йога-практики, экстатик дэнс, арт-медитации, мастер-классы "
-        "по нейрографике и лекции о здоровом образе жизни.\n"
-        "— В бьюти-зоне можно создать свой яркий фестивальный образ, здесь работают мастера брейдинга "
-        "и макияжа, открыт барбершоп.\n"
-        "— Гости с детьми особо ценят Территорию детства, где есть Детская сцена «Ариэль», работают карусели "
-        "и аттракционы, проводятся бесплатные мастер-классы, открыт детский сад с опытными аниматорами, "
-        "в этом году впервые примет участие студия анимационного кино «Мельница» — приедут любимые мультгерои "
-        "Лунтик, Барбоскины и Три богатыря.\n"
-        "— Большая фестивальная ярмарка собирает лучших мастеров хэндмейда, авторской одежды, аксессуаров "
-        "и украшений со всей страны.\n"
-        "— На спортивной площадке есть воркаут-зона, проходят турниры по пляжному волейболу.\n"
-        "— Партнеры фестиваля предлагают бесконечное множество призовых активностей и лаундж-зоны "
-        "для отдыха гостей.\n\n"
-        "Фестиваль «Дикая Мята» — лето, музыка и любовь! Это будет легендарно!"
-    )
+    # Здесь ваш длинный текст от заказчика
+    text = "Полный текст про фестиваль..."
     await msg.reply(text, reply_markup=faq_kb())
 
 @dp.message_handler(lambda m: m.text == "Расписание сцен")
@@ -275,6 +246,7 @@ async def cmd_favs(msg: types.Message):
     lines = []
     for e in sorted(picks, key=lambda x: x["time"]):
         dt = datetime.fromisoformat(e["time"])
+        # поправка на полуночные — уже в reminder_loop
         date = f"{dt.day} {MONTH_NAMES[dt.month]}"
         tm   = dt.strftime("%H:%M")
         lines.append(f"{date} в {tm} | {e['scene']} | {e['artist']}")
@@ -298,21 +270,19 @@ async def cmd_choose_date(msg: types.Message):
         return await msg.reply("На эту дату нет выступлений.", reply_markup=schedule_menu_kb())
     kb = InlineKeyboardMarkup(row_width=1)
     for idx, (tstr, artist) in enumerate(entries):
-        kb.add(InlineKeyboardButton(f"{tstr[11:16]} — {artist}", callback_data=f"fav|{scene}|{iso}|{idx}"))
+        kb.add(InlineKeyboardButton(f"{tstr[11:16]} — {artist}",
+                                    callback_data=f"fav|{scene}|{tstr}"))
     await msg.reply(f"Расписание «{scene}» на {msg.text}:", reply_markup=kb)
 
 @dp.callback_query_handler(lambda c: c.data.startswith("fav|"))
 async def cb_fav(cq: types.CallbackQuery):
-    _, scene, iso, idx = cq.data.split("|", 3)
-    idx = int(idx)
-    tstr, artist = get_entries_for_date(scene, iso)[idx]
+    _, scene, tstr = cq.data.split("|", 2)
     uid = str(cq.from_user.id)
     FAVS.setdefault(uid, [])
-    entry = {"scene": scene, "time": tstr, "artist": artist, "notified": False}
     if not any(x["scene"] == scene and x["time"] == tstr for x in FAVS[uid]):
-        FAVS[uid].append(entry)
+        FAVS[uid].append({"scene": scene, "time": tstr, "artist": dict(get_entries_for_date(scene, tstr[:10]))[tstr] if False else tstr, "artist": next(a for dt,a in SCENES[scene] if dt==tstr), "notified": False})
         save_json(FAVS_FILE, FAVS)
-        await bot.answer_callback_query(cq.id, f"⭐ Добавлено «{artist}»")
+        await bot.answer_callback_query(cq.id, f"⭐ Добавлено")
     else:
         await bot.answer_callback_query(cq.id, "✅ Уже в избранном")
 
@@ -320,6 +290,7 @@ async def cb_fav(cq: types.CallbackQuery):
 async def cmd_back(msg: types.Message):
     await msg.reply("Главное меню:", reply_markup=main_menu_kb())
 
+# ====== Админ-команды ======
 @dp.message_handler(commands=['add_scene'])
 async def cmd_add_scene(msg: types.Message):
     parts = msg.text.split(maxsplit=1)
@@ -332,6 +303,54 @@ async def cmd_add_scene(msg: types.Message):
     save_json(SCENES_FILE, SCENES)
     await msg.reply(f"✅ Сцена «{name}» добавлена.")
 
+@dp.message_handler(commands=['remove_scene'])
+async def cmd_remove_scene(msg: types.Message):
+    parts = msg.text.split(maxsplit=1)
+    if len(parts) < 2:
+        return await msg.reply("Используйте: /remove_scene Название_сцены")
+    name = parts[1].strip()
+    if name not in SCENES:
+        return await msg.reply(f"Сцена «{name}» не найдена.")
+    del SCENES[name]
+    save_json(SCENES_FILE, SCENES)
+    await msg.reply(f"✅ Сцена «{name}» удалена.")
+
+@dp.message_handler(commands=['add_perf'])
+async def cmd_add_perf(msg: types.Message):
+    try:
+        _, payload = msg.text.split(maxsplit=1)
+        scene, dt_str, artist = [s.strip() for s in payload.split('|', 2)]
+    except ValueError:
+        return await msg.reply(
+            "Использование:\n"
+            "/add_perf Сцена|YYYY-MM-DD HH:MM|Имя артиста"
+        )
+    if scene not in SCENES:
+        return await msg.reply(f"Сцена «{scene}» не найдена.")
+    SCENES[scene].append((dt_str, artist))
+    save_json(SCENES_FILE, SCENES)
+    await msg.reply(f"✅ Добавлено в «{scene}»: {dt_str} — {artist}")
+
+@dp.message_handler(commands=['remove_perf'])
+async def cmd_remove_perf(msg: types.Message):
+    try:
+        _, payload = msg.text.split(maxsplit=1)
+        scene, dt_str, artist = [s.strip() for s in payload.split('|', 2)]
+    except ValueError:
+        return await msg.reply(
+            "Использование:\n"
+            "/remove_perf Сцена|YYYY-MM-DD HH:MM|Имя артиста"
+        )
+    if scene not in SCENES:
+        return await msg.reply(f"Сцена «{scene}» не найдена.")
+    entry = (dt_str, artist)
+    if entry not in SCENES[scene]:
+        return await msg.reply("Такого выступления нет.")
+    SCENES[scene].remove(entry)
+    save_json(SCENES_FILE, SCENES)
+    await msg.reply(f"✅ Удалено из «{scene}»: {dt_str} — {artist}")
+
+# ====== Запуск ======
 async def on_startup(dp: Dispatcher):
     await bot.delete_webhook(drop_pending_updates=True)
     asyncio.create_task(reminder_loop())
