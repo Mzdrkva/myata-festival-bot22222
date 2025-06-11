@@ -820,6 +820,15 @@ async def cmd_remove_perf(msg: types.Message):
     save_json(SCENES_FILE, SCENES)
     await msg.reply(f"✅ Удалено из «{scene}»: {dt_str} — {artist}")
 
+@dp.message_handler(lambda m: m.text == "Схема эвакуации")
+async def info_evacuation(msg: types.Message):
+    with open(EVACUATION_IMAGE, "rb") as photo:
+        await bot.send_photo(
+            chat_id=msg.chat.id,
+            photo=photo,
+            caption="📌 Схема эвакуации фестиваля",
+            reply_markup=main_menu_kb()
+            
 @dp.message_handler(commands=['broadcast'])
 async def cmd_broadcast(msg: types.Message):
     if msg.from_user.id not in ADMIN_IDS:
