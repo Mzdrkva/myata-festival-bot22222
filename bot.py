@@ -54,6 +54,7 @@ SCENES_FILE   = "scenes.json"
 FAVS_FILE     = "user_data.json"
 WELCOME_IMAGE = "welcome.jpg"     # Необходимо разместить рядом с bot.py
 MAP_IMAGE     = "map.jpg"         # Файл с картой фестиваля (поместите map.jpg рядом с bot.py)
+EVACUATION_IMAGE = "evacuation_map.jpg"   # или ваше фактическое имя файла
 
 # ====== Стартовое расписание сцен (если отсутствует scenes.json) ======
 DEFAULT_SCENES = {
