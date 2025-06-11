@@ -828,7 +828,8 @@ async def info_evacuation(msg: types.Message):
             photo=photo,
             caption="📌 Схема эвакуации фестиваля",
             reply_markup=main_menu_kb()
-            
+        )  # Добавлена закрывающая скобка
+
 @dp.message_handler(commands=['broadcast'])
 async def cmd_broadcast(msg: types.Message):
     if msg.from_user.id not in ADMIN_IDS:
